@@ -8,6 +8,7 @@ import pprint
 from prettytable import PrettyTable
 import argparse
 import sys
+from all_pricing import pricing_info
 
 # Parser for command line
 parser = argparse.ArgumentParser()
@@ -283,19 +284,20 @@ class AWSAudit:
         regions,
         volume
     ):
-        with open('epl1.json', 'r') as fp:
-            pricing_json = json.load(fp)
-        with open('snapshots_price.json', 'r') as fp:
-            snapshot_pricing = json.load(fp)
-        with open('ebs_pricing_list.json', 'r') as ebs:
-            vol_pricing = json.load(ebs)
-        with open('elbv2_pricing.json', 'r') as elb2:
-            elbv2_pricing = json.load(elb2)
-        with open('elb_pricing.json', 'r') as elb:
-            elb_pricing = json.load(elb)
+        # with open('epl1.json', 'r') as fp:
+        #     pricing_json = json.load(fp)
+        # with open('snapshots_price.json', 'r') as fp:
+        #     snapshot_pricing = json.load(fp)
+        
+        p_info = pricing_info()
+        elbv2 = p_info.price_list_ELBV2()
+        elb = p_info.price_list_ELB()
+        vol_pricing = p_info.price_list_EBS()
+        pricing_json = p_info.price_list_EC2()
+        snapshot_pricing = p_info.price_list_snapshots()
+
         # Pricing
         for region in regions:
-        
             x.add_row(
                 [
                     region,
@@ -374,9 +376,8 @@ class AWSAudit:
             )
             
             classic_elb_instances = self. count_classic_elb(region)
-            for term in elb_pricing[region]['ELB']['OnDemand']:
-                price = float(elb_pricing[region]['ELB']['OnDemand']['USD'])
-                total_cost = round(float(price * total_instances * self.per_month_hours),3)
+            price = float(elb[region]['ELB']['OnDemand']['USD'])
+            total_cost = round(float(price * classic_elb_instances * self.per_month_hours),3)
 
             x.add_row(
                 [
@@ -403,12 +404,11 @@ class AWSAudit:
                 ]
             )
             network_elb_instances = self.count_network_elb(region)
-            for elbv2_price in elbv2_pricing[region]['ELB']['OnDemand']:
-                price = float(elbv2_pricing[region]['ELB']['OnDemand']['USD'])
-                total_cost = round(
-                    float(price * network_elb_instances * self.per_month_hours),
-                    3,
-                )
+            price = float(elbv2[region]['ELBV2']['OnDemand']['USD'])
+            total_cost = round(
+                float(price * network_elb_instances * self.per_month_hours),
+                3,
+            )
             x.add_row(
                 [
                     '',
@@ -573,8 +573,7 @@ class AWSAudit:
                 ]
             )
             attached_snap = self.count_snapshots('attached', region) 
-            if region in (reg for reg in snapshot_pricing):
-                price = float(snapshot_pricing[region]['Snapshot']['OnDemand']['USD'])
+            price = float(snapshot_pricing[region]['Snapshots']['OnDemand']['USD'])
             for volume_id in self.snap_vol_id:
                 if volume_id in (vol_id for vol_id in self.dictionary[region]['EBS']):
                     size = self.dictionary[region]['EBS'][volume_id]['size']

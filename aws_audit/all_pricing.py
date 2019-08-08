@@ -29,15 +29,16 @@ class pricing_info:
             }
         self.pricing_dict()
         self.paginator_connection()
-        self.price_list_EBS()
-        self.price_list_ELBV2()
-        self.price_list_ELB()
-        self.price_list_EC2()
+        # self.price_list_EBS()
+        # self.price_list_ELBV2()
+        # self.price_list_ELB()
+        # self.price_list_EC2()
                 
     def pricing_dict(self):
         for region in aws_region:
             self.pricing[region] = {
                 'EC2': {},
+                'Snapshots': {},
                 'ELB': {},
                 'ELBV2': {},
                 'EBS': {}
@@ -90,7 +91,14 @@ class pricing_info:
                                             'Field':'productFamily', 
                                             'Value':'Load Balancer-Network'},
                                             ])
-        
+        if price_list_type == 'Snapshots':
+            resp_pages = paginator.paginate(ServiceCode="AmazonEC2",
+                                        Filters=[
+                                            {'Type': 'TERM_MATCH', 
+                                            'Field': 'productFamily', 
+                                            'Value': 'Storage Snapshot'}
+                                            ]
+                                            )
         if price_list_type == 'EBS':
             resp_pages = paginator.paginate(ServiceCode='AmazonEC2',
                                         Filters=[
@@ -123,6 +131,7 @@ class pricing_info:
                                 'Location': item['product']['attributes']['location'],
                                 'USD': self.price
                                 }
+        return self.pricing
 
     def price_list_EBS(self):
         self.response_pages('EBS')
@@ -147,7 +156,27 @@ class pricing_info:
                                     'Max Volume Size': item['product']['attributes']['maxVolumeSize'],
                                     'USD': self.price
                                     }
+        return self.pricing
     
+    def price_list_snapshots(self):
+        self.response_pages('Snapshots')
+        for item in self.price_item:
+            terms = item['terms']
+            if 'OnDemand' in terms:
+                region = region_short_names[item['product']['attributes']['location']]
+                self.onDemand_variables(terms, 'OnDemand')
+                
+                if not 'OnDemand' in self.pricing[region]['Snapshots']:
+                    self.pricing[region]['Snapshots']['OnDemand'] = {}
+
+                self.pricing[region]['Snapshots']['OnDemand'] = {
+                                'Description': self.description,
+                                'UsageType': item['product']['attributes']['usagetype'],
+                                'Location': item['product']['attributes']['location'],
+                                'USD': self.price
+                                }
+        return self.pricing
+
     def price_list_ELB(self):
         self.response_pages('ELB')
         for item in self.price_item:
@@ -165,6 +194,7 @@ class pricing_info:
                                 'Location': item['product']['attributes']['location'],
                                 'USD': self.price
                                 }
+        return self.pricing
         
     def price_list_EC2(self):
         self.response_pages('EC2')
@@ -255,6 +285,6 @@ class pricing_info:
                                 for price_dimension in price_dimensions:
                                     self.pricing[region]['EC2'][instance_type]['Reserved'][ri_purchase_option]['RateCode'] = price_dimensions[price_dimension]['rateCode']
                                     self.pricing[region]['EC2'][instance_type]['Reserved'][ri_purchase_option]['USD'] = price_dimensions[price_dimension]['pricePerUnit']['USD']
-        pprint.pprint(self.pricing)        
+        return self.pricing       
      
 price = pricing_info()
